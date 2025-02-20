@@ -1,0 +1,13 @@
+services:
+  ase-retrieval:
+    image: pytorch/pytorch:2.6.0-cuda12.6-cudnn9-runtime
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+    stdin_open: true
+    tty: true
+    ipc: host
