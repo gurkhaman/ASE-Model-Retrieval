@@ -1,1 +1,6 @@
 tensorboard
+timm
+onnx
+huggingface_hub
+transformers
+accelerator
