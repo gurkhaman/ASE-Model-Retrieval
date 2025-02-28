@@ -52,9 +52,13 @@ def create_subclass_datasets():
 
     os.makedirs(SUBCLASS_OUTPUT_DIR, exist_ok=True)
 
-    for i, dataset in enumerate(unique_datasets):
-        dataset_dir = os.path.join(SUBCLASS_OUTPUT_DIR, f"dataset_{i + 1}")
+    for dataset in unique_datasets:
+        dataset_name = "-".join(dataset)
+        dataset_dir = os.path.join(SUBCLASS_OUTPUT_DIR, dataset_name)
+
         os.makedirs(dataset_dir, exist_ok=True)
+
+        labels_dict = {}
 
         for subclass in dataset:
             subclass_path = subclass_to_path[subclass]
@@ -70,11 +74,16 @@ def create_subclass_datasets():
             selected_images = random.sample(images, NUM_IMAGES_PER_SUBCLASS)
 
             for img_path in selected_images:
+                img_filename = os.path.basename(img_path)
                 shutil.copy(
                     img_path, os.path.join(dataset_dir, os.path.basename(img_path))
                 )
+                labels_dict[img_filename] = subclass
 
-        print(f"Dataset {i + 1} created with subclasses: {dataset}")
+        with open(os.path.join(dataset_dir, "labels.json"), "w") as f:
+            json.dump(labels_dict, f, indent=4)
+
+        print(f"Dataset created: {dataset_name}")
 
     print("All 300 random datasets created successfully!")
 
@@ -85,6 +94,7 @@ def create_superclass_datasets():
 
     for superclass, subclasses in imagenet_mapping.items():
         superclass_images = []
+        labels_dict = {}
 
         for subclass_name in subclasses.values():
             subclass_path = os.path.join(IMAGE_DIR, superclass, subclass_name)
@@ -94,7 +104,9 @@ def create_superclass_datasets():
                     for img in os.listdir(subclass_path)
                     if img.endswith(".JPEG")
                 ]
-                superclass_images.extend(images)
+                superclass_images.extend(
+                    (img_path, subclass_name) for img_path in images
+                )
 
         random.seed(SEED)
         selected_images = random.sample(
@@ -104,12 +116,17 @@ def create_superclass_datasets():
         output_superclass_dir = os.path.join(SUPERCLASS_OUTPUT_DIR, superclass)
         os.makedirs(output_superclass_dir, exist_ok=True)
 
-        for img_path in selected_images:
+        for img_path, subclass in selected_images:
+            img_filename = os.path.basename(img_path)
             shutil.copy(
                 img_path,
                 os.path.join(output_superclass_dir, os.path.basename(img_path)),
             )
+            labels_dict[img_filename] = subclass
 
+        with open(os.path.join(output_superclass_dir, "labels.json"), "w") as f:
+            json.dump(labels_dict, f, indent=4)
+            
         print(
             f"Superclass '{superclass}' processed: {len(selected_images)} images saved."
         )

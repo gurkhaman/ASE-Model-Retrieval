@@ -5,3 +5,4 @@ huggingface_hub
 transformers
 accelerator
 dotenv
+datasets
