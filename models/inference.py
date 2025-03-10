@@ -1,5 +1,5 @@
 """
-Takes in a model name and dataset name and collects evaluation metrics.
+Takes in a model and dataset and collects evaluation metrics.
 
 Author: Arogya Kharel
 """
