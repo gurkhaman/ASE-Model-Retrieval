@@ -133,7 +133,6 @@ def create_superclass_datasets():
 
     print("All superclass datasets created successfully!")
 
-
 if __name__ == "__main__":
     create_superclass_datasets()
     create_subclass_datasets()
