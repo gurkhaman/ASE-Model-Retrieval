@@ -9,3 +9,5 @@ datasets
 ray
 ipykernel
 ipywidgets
+evaluate[evaluator]
+scikit-learn
