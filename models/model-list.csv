@@ -3,7 +3,6 @@ timm/mobilenetv3_small_100.lamb_in1k,https://huggingface.co/timm/mobilenetv3_sma
 timm/resnet50.a1_in1k,https://huggingface.co/timm/resnet50.a1_in1k,,
 timm/inception_v3.tv_in1k,https://huggingface.co/timm/inception_v3.tv_in1k,,
 timm/swinv2_large_window12to16_192to256.ms_in22k_ft_in1k,https://huggingface.co/timm/swinv2_large_window12to16_192to256.ms_in22k_ft_in1k,,
-timm/eva_giant_patch14_560.m30m_ft_in22k_in1k,https://huggingface.co/timm/eva_giant_patch14_560.m30m_ft_in22k_in1k,,
 timm/efficientnet_b0.ra_in1k,https://huggingface.co/timm/efficientnet_b0.ra_in1k,,
 timm/beitv2_base_patch16_224.in1k_ft_in22k,https://huggingface.co/timm/beitv2_base_patch16_224.in1k_ft_in22k,,
 timm/mobilevit_s.cvnets_in1k,https://huggingface.co/timm/mobilevit_s.cvnets_in1k,,
