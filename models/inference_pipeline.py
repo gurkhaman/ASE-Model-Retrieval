@@ -43,7 +43,7 @@ def batch_classification(images, model_id, gpu_id, batch_size=128):
     predictions = []
 
     for img_path, pred in zip(
-        images, tqdm(classifier(images, batch_size=batch_size), total=len(images))
+        images, tqdm(classifier(images, batch_size=batch_size), total=len(images), colour="blue")
     ):
         corrected_pred = [
             {"label": LABEL_MAP.get(p["label"], p["label"]), "score": p["score"]}
@@ -95,7 +95,10 @@ def evaluate_model(predictions, dataset):
 def process_model(model_id):
     results = []
     for dataset_name, dataset in tqdm(
-        hf_dataset_dict.items(), desc=f"Processing {model_id}", leave=True
+        hf_dataset_dict.items(),
+        desc=f"Processing {model_id}",
+        colour="green",
+        leave=True,
     ):
         print(f"Evaluating {model_id} on {dataset_name}")
         predictions = batch_classification(dataset["image"], model_id, gpu_id=0)
@@ -105,7 +108,11 @@ def process_model(model_id):
         )
 
         file_path = f"evaluation_results/{dataset_name}.csv"
-        results_df.to_csv(file_path, index=False)
+        if os.path.exists(file_path):
+            results_df.to_csv(file_path, mode="a", header=False, index=False)
+        else:
+            results_df.to_csv(file_path, index=False)
+
         print(f"Results saved: {file_path}")
 
     return results
@@ -120,7 +127,11 @@ if __name__ == "__main__":
     warnings.filterwarnings("ignore", category=UserWarning)
 
     os.makedirs("evaluation_results", exist_ok=True)
-    models_df["evaluation_results"] = models_df["model-id"].apply(process_model)
+
+    tqdm.pandas(desc="Processing Models", colour="yellow")
+    models_df["evaluation_results"] = models_df["model-id"].progress_apply(
+        process_model
+    )
     log_results = [
         entry for sublist in models_df["evaluation_results"] for entry in sublist
     ]
