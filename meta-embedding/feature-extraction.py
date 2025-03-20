@@ -11,12 +11,14 @@ from datasets import load_from_disk
 from transformers import CLIPModel, AutoTokenizer, AutoProcessor
 from sklearn.cluster import KMeans
 from PIL import Image
+import numpy as np
 
 
 HF_DATASET_DIR = "/workspaces/ASE-Model-Retrieval/data/imagenet/.cache/hf_datasets"
-OUTPUT_DIR = "/workspaces/ASE-Model-Retrieval/models/.cache/task_embeddings"
+OUTPUT_DIR = "/workspaces/ASE-Model-Retrieval/meta-embedding/.cache/task_embeddings"
 BATCH_SIZE = 128
 N_CLUSTERS = 1  # KMeans for meta-features
+N_SPLITS = 5  # Split features
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(DEVICE)
@@ -30,6 +32,8 @@ def get_text_features(labels):
     ).to(DEVICE, non_blocking=True)
     with torch.no_grad():
         text_features = MODEL.get_text_features(**text_inputs)
+
+    text_features /= text_features.norm(dim=-1, keepdim=True)
     return text_features
 
 
@@ -40,6 +44,7 @@ def get_image_features(image_paths):
     with torch.no_grad():
         image_features = MODEL.get_image_features(**inputs)
 
+    image_features /= image_features.norm(dim=-1, keepdim=True)
     return image_features
 
 
@@ -47,9 +52,18 @@ def compute_task_meta_features(features):
     if features.is_cuda:
         features = features.cpu().numpy()
 
-    kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=42)
-    kmeans.fit(features)
-    return torch.tensor(kmeans.cluster_centers_[0], device=DEVICE)
+    feature_splits = np.array_split(features, N_SPLITS)
+
+    cluster_features = np.concatenate(
+        [
+            KMeans(n_clusters=N_CLUSTERS, random_state=42)
+            .fit(split)
+            .cluster_centers_[0]
+            for split in feature_splits
+        ]
+    )
+
+    return torch.tensor(cluster_features, device=DEVICE)
 
 
 def process_dataset(dataset_name, dataset):
@@ -74,7 +88,13 @@ def process_dataset(dataset_name, dataset):
     )
     task_meta_features = compute_task_meta_features(image_features)
 
-    final_features = torch.cat((task_meta_features, text_features.mean(dim=0)), dim=0)
+    # Additional Feature Extraction from Image Text Descriptions
+    itext_features = get_text_features(dataset["label"])  # Encode per-image labels
+    itext_meta_features = compute_task_meta_features(itext_features)
+
+    f_meta_features = torch.lerp(task_meta_features, itext_meta_features, 0.5)
+
+    final_features = torch.cat((f_meta_features, text_features[0]), dim=0)
 
     output_path = os.path.join(OUTPUT_DIR, f"{dataset_name}_task_embedding.pt")
     torch.save(final_features, output_path)
