@@ -166,7 +166,7 @@ def parse_args():
     return parser.parse_args()
 
 
-@ray.remote(num_gpus=1 / 3)
+@ray.remote
 def process_model_ray(model_id, dataset_dict, label_map, batch_size, run_dir):
     # Make sure run_dir exists inside the worker
     os.makedirs(run_dir, exist_ok=True)
@@ -217,7 +217,7 @@ def main():
         run_dir = os.path.join(evaluation_results_dir, f"run_{rep + 1}")
 
         tasks = [
-            process_model_ray.remote(
+            process_model_ray.options(num_gpus=1 / tasks_per_gpu).remote(
                 model_id, dataset_dict, label_map, batch_size, run_dir
             )
             for model_id in models_df["model-id"]
