@@ -17,36 +17,31 @@ from sklearn.metrics import (
 )
 import json
 import warnings
+import yaml
+import argparse
 
 
-HF_DATASET_DIR = "/workspaces/ASE-Model-Retrieval/data/imagenet/.cache/hf_datasets"
-MODELS_CSV_PATH = "/workspaces/ASE-Model-Retrieval/models/model-list.csv"
-LABEL_MAP_PATH = "/workspaces/ASE-Model-Retrieval/data/imagenet/label_mapping.json"
-BATCH_SIZE = 128
-TASK_PER_GPU = 2
-
-MODEL_PIPELINES = {}
-with open(LABEL_MAP_PATH, "r") as f:
-    LABEL_MAP = json.load(f)
+def get_pipeline(model_id, gpu_id, pipeline_cache):
+    if model_id not in pipeline_cache:
+        pipeline_cache[model_id] = pipeline(model=model_id, device=gpu_id)
+    return pipeline_cache[model_id]
 
 
-def get_pipeline(model_id, gpu_id):
-    if model_id not in MODEL_PIPELINES:
-        MODEL_PIPELINES[model_id] = pipeline(model=model_id, device=gpu_id)
-    return MODEL_PIPELINES[model_id]
-
-
-def batch_classification(images, model_id, gpu_id, batch_size=128):
+def batch_classification(
+    images, model_id, gpu_id, label_map, batch_size, pipeline_cache
+):
     print(f"Batch classification for {model_id}.")
-    classifier = get_pipeline(model_id, gpu_id)
+    classifier = get_pipeline(model_id, gpu_id, pipeline_cache)
 
     predictions = []
-
     for img_path, pred in zip(
-        images, tqdm(classifier(images, batch_size=batch_size), total=len(images), colour="blue")
+        images,
+        tqdm(
+            classifier(images, batch_size=batch_size), total=len(images), colour="blue"
+        ),
     ):
         corrected_pred = [
-            {"label": LABEL_MAP.get(p["label"], p["label"]), "score": p["score"]}
+            {"label": label_map.get(p["label"], p["label"]), "score": p["score"]}
             for p in pred
         ]
         predictions.append(
@@ -92,16 +87,23 @@ def evaluate_model(predictions, dataset):
     }
 
 
-def process_model(model_id):
+def process_model(model_id, dataset_dict, label_map, batch_size, pipeline_cache):
     results = []
     for dataset_name, dataset in tqdm(
-        hf_dataset_dict.items(),
+        dataset_dict.items(),
         desc=f"Processing {model_id}",
         colour="green",
         leave=True,
     ):
         print(f"Evaluating {model_id} on {dataset_name}")
-        predictions = batch_classification(dataset["image"], model_id, gpu_id=0)
+        predictions = batch_classification(
+            dataset["image"],
+            model_id,
+            gpu_id=0,
+            label_map=label_map,
+            batch_size=batch_size,
+            pipeline_cache=pipeline_cache,
+        )
         result = evaluate_model(predictions, dataset)
         results_df = pd.DataFrame(
             [{"model_id": model_id, "dataset": dataset_name, **result}]
@@ -118,22 +120,57 @@ def process_model(model_id):
     return results
 
 
-if __name__ == "__main__":
-    hf_dataset_dict = load_from_disk(HF_DATASET_DIR)
-    print(f"Loaded {len(hf_dataset_dict.items())} datasets...")
-    models_df = pd.read_csv(MODELS_CSV_PATH)
+def load_config(path):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run model evaluation with config")
+    parser.add_argument("--config", type=str, help="Path to the YAML config file")
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    config = load_config(args.config)
+
+    paths = config["paths"]
+    params = config["params"]
+    batch_size = params["batch_size"]
+
+    # Load label map
+    with open(paths["label_map"], "r") as f:
+        label_map = json.load(f)
+
+    # Load dataset
+    dataset_dict = load_from_disk(paths["dataset_dir"])
+    print(f"Loaded {len(dataset_dict.items())} datasets...")
+
+    # Load models CSV
+    models_df = pd.read_csv(paths["models_csv"])
     print(f"Loaded {models_df.shape[0]} pre-trained models...")
 
+    # Setup
     warnings.filterwarnings("ignore", category=UserWarning)
-
     os.makedirs("evaluation_results", exist_ok=True)
-
     tqdm.pandas(desc="Processing Models", colour="yellow")
+
+    # Shared pipeline cache
+    pipeline_cache = {}
+
     models_df["evaluation_results"] = models_df["model-id"].progress_apply(
-        process_model
+        lambda mid: process_model(
+            mid, dataset_dict, label_map, batch_size, pipeline_cache
+        )
     )
+
     log_results = [
         entry for sublist in models_df["evaluation_results"] for entry in sublist
     ]
     results_df = pd.DataFrame(log_results)
     results_df.to_csv("model_evaluation_log.csv", index=False)
+
+
+if __name__ == "__main__":
+    main()
