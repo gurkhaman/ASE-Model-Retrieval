@@ -6,3 +6,4 @@ paths:
 params:
   batch_size: 128
   task_per_gpu: 2
+  repetitions: 15

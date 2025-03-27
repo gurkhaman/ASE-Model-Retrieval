@@ -81,10 +81,45 @@ def evaluate_model(predictions, dataset):
         "Precision": precision,
         "Recall": recall,
         "F1-score": f1,
-        "Classification Report": classification_report(
-            y_true, y_pred, output_dict=True
-        ),
     }
+
+
+def aggregate_results(repetitions, dataset_names, output_dir):
+    aggregated_rows = []
+
+    for dataset in dataset_names:
+        all_dfs = [
+            pd.read_csv(os.path.join(output_dir, f"run_{r}", f"{dataset}.csv"))
+            for r in range(1, repetitions + 1)
+            if os.path.exists(os.path.join(output_dir, f"run_{r}", f"{dataset}.csv"))
+        ]
+        if all_dfs:
+            combined_df = pd.concat(all_dfs)
+            grouped = (
+                combined_df.groupby(["model_id", "dataset"])
+                .agg(
+                    {
+                        "Top-1 Accuracy": ["mean", "std"],
+                        "Top-5 Accuracy": ["mean", "std"],
+                        "Precision": ["mean", "std"],
+                        "Recall": ["mean", "std"],
+                        "F1-score": ["mean", "std"],
+                    }
+                )
+                .reset_index()
+            )
+
+            grouped.columns = [
+                "_".join(col).strip("_") for col in grouped.columns.values
+            ]
+            aggregated_rows.append(grouped)
+
+    if aggregated_rows:
+        final_df = pd.concat(aggregated_rows)
+        final_df.to_csv(os.path.join(output_dir, "aggregated_metrics.csv"), index=False)
+        print(
+            f"Aggregated metrics saved to: {os.path.join(output_dir, 'aggregated_metrics.csv')}"
+        )
 
 
 def process_model(model_id, dataset_dict, label_map, batch_size, pipeline_cache):
@@ -138,6 +173,7 @@ def main():
     paths = config["paths"]
     params = config["params"]
     batch_size = params["batch_size"]
+    repetitions = params.get("repetitions", 1)
 
     # Load label map
     with open(paths["label_map"], "r") as f:
@@ -145,6 +181,7 @@ def main():
 
     # Load dataset
     dataset_dict = load_from_disk(paths["dataset_dir"])
+    dataset_names = list(dataset_dict.keys())
     print(f"Loaded {len(dataset_dict.items())} datasets...")
 
     # Load models CSV
@@ -156,20 +193,21 @@ def main():
     os.makedirs("evaluation_results", exist_ok=True)
     tqdm.pandas(desc="Processing Models", colour="yellow")
 
-    # Shared pipeline cache
-    pipeline_cache = {}
+    for rep in range(repetitions):
+        print(f"\n===== Starting run {rep + 1} of {repetitions} =====")
 
-    models_df["evaluation_results"] = models_df["model-id"].progress_apply(
-        lambda mid: process_model(
-            mid, dataset_dict, label_map, batch_size, pipeline_cache
+        run_dir = os.path.join("evaluation_results", f"run_{rep + 1}")
+
+        # Shared pipeline cache
+        pipeline_cache = {}
+
+        models_df["evaluation_results"] = models_df["model-id"].progress_apply(
+            lambda mid: process_model(
+                mid, dataset_dict, label_map, batch_size, pipeline_cache, run_dir
+            )
         )
-    )
 
-    log_results = [
-        entry for sublist in models_df["evaluation_results"] for entry in sublist
-    ]
-    results_df = pd.DataFrame(log_results)
-    results_df.to_csv("model_evaluation_log.csv", index=False)
+    aggregate_results(repetitions=repetitions, dataset_names=dataset_names)
 
 
 if __name__ == "__main__":
