@@ -2,6 +2,7 @@ paths:
   dataset_dir: "/workspaces/ASE-Model-Retrieval/data/imagenet/.cache/hf_datasets"
   models_csv: "/workspaces/ASE-Model-Retrieval/models/model-list.csv"
   label_map: "/workspaces/ASE-Model-Retrieval/data/imagenet/label_mapping.json"
+  evaluation_results_dir: "/workspaces/ASE-Model-Retrieval/data/multi_runs/evaluation_results"
 
 params:
   batch_size: 128

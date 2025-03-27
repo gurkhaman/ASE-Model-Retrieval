@@ -19,6 +19,7 @@ import json
 import warnings
 import yaml
 import argparse
+import ray
 
 
 def get_pipeline(model_id, gpu_id, pipeline_cache):
@@ -122,13 +123,12 @@ def aggregate_results(repetitions, dataset_names, output_dir):
         )
 
 
-def process_model(model_id, dataset_dict, label_map, batch_size, pipeline_cache):
+def process_model(
+    model_id, dataset_dict, label_map, batch_size, pipeline_cache, run_dir
+):
     results = []
     for dataset_name, dataset in tqdm(
-        dataset_dict.items(),
-        desc=f"Processing {model_id}",
-        colour="green",
-        leave=True,
+        dataset_dict.items(), desc=f"Processing {model_id}", colour="green", leave=True
     ):
         print(f"Evaluating {model_id} on {dataset_name}")
         predictions = batch_classification(
@@ -144,7 +144,7 @@ def process_model(model_id, dataset_dict, label_map, batch_size, pipeline_cache)
             [{"model_id": model_id, "dataset": dataset_name, **result}]
         )
 
-        file_path = f"evaluation_results/{dataset_name}.csv"
+        file_path = os.path.join(run_dir, f"{dataset_name}.csv")
         if os.path.exists(file_path):
             results_df.to_csv(file_path, mode="a", header=False, index=False)
         else:
@@ -166,14 +166,27 @@ def parse_args():
     return parser.parse_args()
 
 
+@ray.remote(num_gpus=1 / 3)
+def process_model_ray(model_id, dataset_dict, label_map, batch_size, run_dir):
+    # Make sure run_dir exists inside the worker
+    os.makedirs(run_dir, exist_ok=True)
+    pipeline_cache = {}
+    return process_model(
+        model_id, dataset_dict, label_map, batch_size, pipeline_cache, run_dir
+    )
+
+
 def main():
     args = parse_args()
     config = load_config(args.config)
 
     paths = config["paths"]
     params = config["params"]
-    batch_size = params["batch_size"]
+    evaluation_results_dir = paths["evaluation_results_dir"]
+
+    batch_size = params.get("batch_size", 128)
     repetitions = params.get("repetitions", 1)
+    tasks_per_gpu = params.get("task_per_gpu", 1)
 
     # Load label map
     with open(paths["label_map"], "r") as f:
@@ -190,22 +203,34 @@ def main():
 
     # Setup
     warnings.filterwarnings("ignore", category=UserWarning)
-    os.makedirs("evaluation_results", exist_ok=True)
+    os.makedirs(evaluation_results_dir, exist_ok=True)
+
+    ray.init()
+    NUM_GPUS = ray.available_resources().get("GPU", 1)
+    MAX_CONCURRENT_TASKS = int(NUM_GPUS * tasks_per_gpu)
+
     tqdm.pandas(desc="Processing Models", colour="yellow")
 
     for rep in range(repetitions):
         print(f"\n===== Starting run {rep + 1} of {repetitions} =====")
 
-        run_dir = os.path.join("evaluation_results", f"run_{rep + 1}")
+        run_dir = os.path.join(evaluation_results_dir, f"run_{rep + 1}")
 
-        # Shared pipeline cache
-        pipeline_cache = {}
-
-        models_df["evaluation_results"] = models_df["model-id"].progress_apply(
-            lambda mid: process_model(
-                mid, dataset_dict, label_map, batch_size, pipeline_cache, run_dir
+        tasks = [
+            process_model_ray.remote(
+                model_id, dataset_dict, label_map, batch_size, run_dir
             )
-        )
+            for model_id in models_df["model-id"]
+        ]
+
+        remaining_tasks = tasks
+        results = []
+        while remaining_tasks:
+            num_ready = min(MAX_CONCURRENT_TASKS, len(remaining_tasks))
+            done_tasks, remaining_tasks = ray.wait(
+                remaining_tasks, num_returns=num_ready
+            )
+            results.extend(ray.get(done_tasks))
 
     aggregate_results(repetitions=repetitions, dataset_names=dataset_names)
 

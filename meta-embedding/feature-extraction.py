@@ -100,6 +100,7 @@ def process_dataset(dataset_name, dataset):
     torch.save(final_features, output_path)
 
     print(f"Saved task embedding for {dataset_name}: {output_path}")
+    print("-" * 50)
 
 
 def main():
