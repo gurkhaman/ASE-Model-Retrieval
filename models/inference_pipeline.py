@@ -22,17 +22,17 @@ import argparse
 import ray
 
 
-def get_pipeline(model_id, gpu_id, pipeline_cache):
+def get_pipeline(model_id, pipeline_cache, gpu_id=0):
     if model_id not in pipeline_cache:
         pipeline_cache[model_id] = pipeline(model=model_id, device=gpu_id)
     return pipeline_cache[model_id]
 
 
 def batch_classification(
-    images, model_id, gpu_id, label_map, batch_size, pipeline_cache
+    images, model_id, label_map, batch_size, pipeline_cache
 ):
     print(f"Batch classification for {model_id}.")
-    classifier = get_pipeline(model_id, gpu_id, pipeline_cache)
+    classifier = get_pipeline(model_id, pipeline_cache)
 
     predictions = []
     for img_path, pred in zip(
@@ -134,7 +134,6 @@ def process_model(
         predictions = batch_classification(
             dataset["image"],
             model_id,
-            gpu_id=0,
             label_map=label_map,
             batch_size=batch_size,
             pipeline_cache=pipeline_cache,
@@ -168,7 +167,9 @@ def parse_args():
 
 @ray.remote
 def process_model_ray(model_id, dataset_dict, label_map, batch_size, run_dir):
-    # Make sure run_dir exists inside the worker
+    assigned_gpus = os.environ.get("CUDA_VISIBLE_DEVICES", "0")
+    print(f"[Ray Task] Model: {model_id} | Assigned GPU(s): {assigned_gpus}")
+
     os.makedirs(run_dir, exist_ok=True)
     pipeline_cache = {}
     return process_model(
