@@ -1,6 +1,5 @@
 tensorboard
 timm
-onnx
 huggingface_hub
 transformers
 accelerator
@@ -11,3 +10,4 @@ ipykernel
 ipywidgets
 evaluate[evaluator]
 scikit-learn
+pyyaml
