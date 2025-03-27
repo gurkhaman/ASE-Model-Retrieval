@@ -28,9 +28,7 @@ def get_pipeline(model_id, pipeline_cache, gpu_id=0):
     return pipeline_cache[model_id]
 
 
-def batch_classification(
-    images, model_id, label_map, batch_size, pipeline_cache
-):
+def batch_classification(images, model_id, label_map, batch_size, pipeline_cache):
     print(f"Batch classification for {model_id}.")
     classifier = get_pipeline(model_id, pipeline_cache)
 
@@ -167,10 +165,19 @@ def parse_args():
 
 @ray.remote
 def process_model_ray(model_id, dataset_dict, label_map, batch_size, run_dir):
-    assigned_gpus = os.environ.get("CUDA_VISIBLE_DEVICES", "0")
-    print(f"[Ray Task] Model: {model_id} | Assigned GPU(s): {assigned_gpus}")
+
+    # Get assigned GPU IDs
+    gpu_ids = ray.get_gpu_ids()
+    if not gpu_ids:
+        print(f"[ERROR] No GPU assigned for {model_id}, dataset {dataset_dict}")
+        return
+
+    gpu_id = gpu_ids[0]  # Assign the first available GPU
+    env = os.environ.copy()
+    env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
 
     os.makedirs(run_dir, exist_ok=True)
+    
     pipeline_cache = {}
     return process_model(
         model_id, dataset_dict, label_map, batch_size, pipeline_cache, run_dir
@@ -208,6 +215,7 @@ def main():
 
     ray.init()
     NUM_GPUS = ray.available_resources().get("GPU", 1)
+    print(f"Ray detected {NUM_GPUS} GPUs")
     MAX_CONCURRENT_TASKS = int(NUM_GPUS * tasks_per_gpu)
 
     tqdm.pandas(desc="Processing Models", colour="yellow")
