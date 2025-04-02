@@ -1,0 +1,9 @@
+paths:
+  dataset_dir: "/workspaces/ASE-Model-Retrieval/data/imagenet/.cache/hf_datasets"
+  models_csv: "/workspaces/ASE-Model-Retrieval/models/model-list.csv"
+  evaluation_results_dir: "/workspaces/ASE-Model-Retrieval/data/multi_runs/evaluation_results"
+  meta_features_dir: "/workspaces/ASE-Model-Retrieval/meta-embedding/.cache/task_embeddings"
+
+params:
+  n_estimators: 100
+  num_classes: 93
