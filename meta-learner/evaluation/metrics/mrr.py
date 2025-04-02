@@ -1,17 +1,12 @@
 import torch
 
 
-def MRR(model_list, sample_size=1):
-    mrr = []
+def mrr(model_list):
+    pred_scores = torch.tensor([m.pred_perf for m in model_list])
+    true_scores = torch.tensor([m.real_perf for m in model_list])
 
-    for _ in range(sample_size):
-        preds = torch.tensor([m.pred_perf for m in model_list])
-        reals = torch.tensor([m.real_perf for m in model_list])
+    pred_order = torch.argsort(pred_scores, descending=True)
+    top_true_idx = torch.argmax(true_scores)
 
-        predicted_order = torch.argsort(preds, descending=True)
-        top_real_idx = torch.argmax(reals)
-
-        rank = (predicted_order == top_real_idx).nonzero(as_tuple=True)[0].item() + 1
-        mrr.append(1.0 / rank)
-
-    return mrr
+    rank = (pred_order == top_true_idx).nonzero(as_tuple=True)[0].item() + 1
+    return 1.0 / rank
