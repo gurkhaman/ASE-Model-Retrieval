@@ -11,3 +11,4 @@ ipywidgets
 evaluate[evaluator]
 scikit-learn
 pyyaml
+wandb
