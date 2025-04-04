@@ -1,5 +1,5 @@
-from .ndcg import NDCG
-from .mrr import MRR
-from .map import MAP
+from .ndcg import ndcg
+from .mrr import mrr
+from .map import map_at_k
 
-__all__ = ["NDCG", "MAP", "MAP"]
+__all__ = ["ndcg", "mrr", "map_at_k"]
