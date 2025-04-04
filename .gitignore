@@ -172,3 +172,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+acc_list.pkl
+map_list.pkl
+mrr_list.pkl
+ndcg5_list.pkl
