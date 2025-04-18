@@ -186,37 +186,58 @@ if __name__ == "__main__":
     )
     print(model_stats)
 
-    start_time = time.time()
-    results = train_and_evaluate(
-        model_name=model_cfg["name"],
-        model_params=model_cfg.get("params", {}),
-        X_train=learner_data.X_train,
-        y_train=learner_data.y_train,
-        X_test=learner_data.X_test,
-        y_test=learner_data.y_test,
-    )
     all_model_names = learner_data.evaluation_data[0]["model_id"].tolist()
 
-    # Subset of model indices the classifier actually learned
-    class_indices = results["classes"]
+    run_summaries = []
+    total_time = 0
 
-    summary = evaluate_ranking(
-        y_proba=results["y_proba"],
-        idx_test=learner_data.idx_test,
-        real_accuracy_matrix=learner_data.real_accuracy_matrix,
-        model_names=[all_model_names[i] for i in class_indices],
-        class_indices=class_indices,
-        eval_config=eval_cfg,
-    )
+    num_runs = wandb_cfg["runs"]
+    for run in range(num_runs):
+        print(f"\n[RUN {run + 1}/{num_runs}]")
 
-    elapsed = time.time() - start_time
-    print(f"[⏱️] Total time for training + evaluation: {elapsed:.2f} seconds")
-    wandb.log({"timing/train_eval_total_seconds": elapsed})
+        start_time = time.time()
+        results = train_and_evaluate(
+            model_name=model_cfg["name"],
+            model_params=model_cfg.get("params", {}),
+            X_train=learner_data.X_train,
+            y_train=learner_data.y_train,
+            X_test=learner_data.X_test,
+            y_test=learner_data.y_test,
+        )
 
-    wandb.log(
-        {
-            f"ranking/{k}": v
-            for k, v in summary.items()
-            if isinstance(v, (int, float, np.float32, np.float64))
-        }
-    )
+        # Subset of model indices the classifier actually learned
+        class_indices = results["classes"]
+
+        summary = evaluate_ranking(
+            y_proba=results["y_proba"],
+            idx_test=learner_data.idx_test,
+            real_accuracy_matrix=learner_data.real_accuracy_matrix,
+            model_names=[all_model_names[i] for i in class_indices],
+            class_indices=class_indices,
+            eval_config=eval_cfg,
+        )
+
+        elapsed = time.time() - start_time
+        print(f"[⏱️] Total time for training + evaluation: {elapsed:.2f} seconds")
+        total_time += elapsed
+
+        wandb.log({f"run_{run + 1}/train_eval_time": elapsed})
+        for k, v in summary.items():
+            if isinstance(v, (int, float, np.float32, np.float64)):
+                wandb.log({f"run_{run + 1}/ranking/{k}": v})
+
+        run_summaries.append(summary)
+
+    metric_keys = run_summaries[0].keys()
+    aggregated = {
+        k: np.mean([s[k] for s in run_summaries])
+        for k in metric_keys
+        if isinstance(run_summaries[0][k], (int, float, np.float32, np.float64))
+    }
+
+    print("\n[📊] Aggregated Summary (Avg over runs):")
+    for k, v in aggregated.items():
+        print(f"{k}: {v:.4f}")
+
+    wandb.log({"aggregated_ranking": aggregated})
+    wandb.log({"timing/total_train_eval_time": total_time})
