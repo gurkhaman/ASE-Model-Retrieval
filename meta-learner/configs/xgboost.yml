@@ -1,0 +1,43 @@
+paths:
+  evaluation_results_dir: "/workspaces/ASE-Model-Retrieval/data/evaluation_results"
+  meta_features_dir: "/workspaces/ASE-Model-Retrieval/meta-embedding/.cache/task_embeddings"
+
+model:
+  name: "xgboost"
+  params:
+    random_state: 1
+    learning_rate: 0.1
+    use_label_encoder: false
+    # eval_metric: "mlogloss"
+    # n_estimators: 100
+    # max_depth: 6
+
+evaluation:
+  include_only:
+    [
+      "timm/swinv2_large_window12to16_192to256.ms_in22k_ft_in1k",
+      "timm/caformer_b36.sail_in22k_ft_in1k",
+      "timm/convnextv2_base.fcmae_ft_in22k_in1k",
+      "timm/tiny_vit_21m_384.dist_in22k_ft_in1k",
+      "timm/dm_nfnet_f2.dm_in1k",
+      # "timm/davit_base.msft_in1k",
+      # "timm/twins_svt_large.in1k",
+      # "timm/volo_d1_224.sail_in1k",
+      # "timm/swin_base_patch4_window7_224.ms_in22k_ft_in1k",
+      # "timm/nest_base_jx.goog_in1k",
+      # "timm/deit3_small_patch16_384.fb_in22k_ft_in1k",
+      # "timm/focalnet_small_lrf.ms_in1k",
+      # "timm/maxvit_nano_rw_256.sw_in1k",
+      # "timm/sequencer2d_l.in1k",
+      # "timm/pit_b_224.in1k",
+    ]
+  # include_only: null
+  exclude: null
+  top-k:
+    ndcg: 5
+    map: 3
+
+wandb:
+  enabled: true
+  project: "automrm"
+  run_name: "xgboost_includeonly_top5_automrm"

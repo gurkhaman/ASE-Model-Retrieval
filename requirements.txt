@@ -12,3 +12,4 @@ evaluate[evaluator]
 scikit-learn
 pyyaml
 wandb
+xgboost
