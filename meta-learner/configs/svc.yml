@@ -1,6 +1,6 @@
 paths:
   evaluation_results_dir: "/workspaces/ASE-Model-Retrieval/data/evaluation_results"
-  meta_features_dir: "/workspaces/ASE-Model-Retrieval/meta-embedding/.cache/task_embeddings"
+  meta_features_dir: "/workspaces/ASE-Model-Retrieval/meta-embedding/task_embeddings"
 
 model:
   name: "custom_bagging_svc"
