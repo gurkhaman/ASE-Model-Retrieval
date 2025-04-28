@@ -37,7 +37,7 @@ def load_model(model_name, model_params):
     elif model_name == "xgboost":
         return CustomXGBoost(**model_params)
     elif model_name == "randomforest":
-        return RandomForestClassifier()
+        return RandomForestClassifier(n_estimators=model_params.get("n_estimators", 10))
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -129,27 +129,6 @@ def evaluate_ranking(
     print(summary[-1])
 
     summary = evaluator.summarize(include_stats=True)
-
-    # comparisons = compare_rankings(
-    #     y_proba=y_proba,
-    #     real_accuracy_matrix=real_accuracy_matrix,
-    #     idx_test=idx_test,
-    #     class_indices=class_indices,
-    #     model_names=model_names,
-    #     top_k=eval_config["top-k"]["ndcg"],  # or another top_k value if you prefer
-    # )
-
-    # comparison_table = wandb.Table(columns=["task_id", "true_top", "pred_top"])
-
-    # for entry in comparisons:
-    #     comparison_table.add_data(
-    #         entry["task_index"],
-    #         ", ".join(entry["true_top"]),
-    #         ", ".join(entry["pred_top"]),
-    #     )
-
-    # wandb.log({"Top-K Comparisons": comparison_table})
-
     return summary
 
 
